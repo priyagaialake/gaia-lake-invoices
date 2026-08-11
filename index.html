@@ -15,12 +15,13 @@ or redistribution is strictly prohibited.
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
 <title>Gaia Lake Bungalow — Assets &amp; Inventory Manager</title>
 
-<!-- Add your favicon link here -->
-    <link rel="icon" type="image/png" href="favicon.png">
-
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Google Identity Services (OAuth2) + Google API Client, used by the Cloud Connection
+     Workspace in Settings for the optional Google Drive live-sync feature. -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js" async defer></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
@@ -31,6 +32,11 @@ or redistribution is strictly prohibited.
     --theme-color-light: #edf5eb;
     --ink: #21261f;
     --paper: #F7F5EF;
+    --sidebar-bg: #1c2128;
+    --sidebar-text: #F3F1E7;
+    --sidebar-text-muted: rgba(243,241,231,0.60);
+    --sidebar-hover: rgba(255,255,255,0.08);
+    --sidebar-border: rgba(255,255,255,0.10);
   }
   html,body{ background:var(--paper); font-family:'Inter',system-ui,sans-serif; color:var(--ink); }
   @media (min-width:1024px){
@@ -50,8 +56,8 @@ or redistribution is strictly prohibited.
     outline:2px solid var(--theme-color); outline-offset:1px;
   }
   .badge-usable{ background:#DCFCE7; color:#166534; }
-  .badge-damaged{ background:#FEF9C3; color:#854D0E; }
-  .badge-repair{ background:#FFEDD5; color:#9A3412; }
+  .badge-damaged{ background:#FFFF00; color:#5c4d00; }
+  .badge-repair{ background:#FF8000; color:#ffffff; }
   .badge-discarded{ background:#FEE2E2; color:#991B1B; }
   .badge-missing{ background:#E5E7EB; color:#374151; }
   #a4-preview{ width:210mm; min-height:297mm; box-shadow:0 4px 24px rgba(0,0,0,0.12); }
@@ -65,25 +71,70 @@ or redistribution is strictly prohibited.
   .modal-backdrop{ background:rgba(20,20,15,0.55); backdrop-filter: blur(2px); }
   .scroll-thin{ scrollbar-width: thin; }
   .grip-dot{ width:6px; height:6px; border-radius:9999px; }
+
+  /* Sidebar / menu bar theming — independent of light/dark mode below */
+  .sidebar-panel{ background:var(--sidebar-bg); color:var(--sidebar-text); }
+  .sidebar-border{ border-color:var(--sidebar-border) !important; }
+  .sidebar-muted{ color:var(--sidebar-text-muted); }
+  .sidebar-item{ color:var(--sidebar-text-muted); }
+  .sidebar-item:hover{ background:var(--sidebar-hover); color:var(--sidebar-text); }
+
+  /* App-wide dark mode — scoped to #shell only, so #print-root (used for
+     print/PDF output) is never affected regardless of the active mode. */
+  #shell.dark{ background:#14171b; color:#EDEAE0; }
+  #shell.dark [class*="bg-white"]{ background-color:#1c2027 !important; }
+  #shell.dark [class*="border-[#E7E2D3]"]{ border-color:#2b2f38 !important; }
+  #shell.dark [class*="border-[#E2DFD3]"]{ border-color:#333844 !important; }
+  #shell.dark [class*="border-[#EFEBDD]"]{ border-color:#2b2f38 !important; }
+  #shell.dark [class*="border-[#F1EEE3]"]{ border-color:#2b2f38 !important; }
+  #shell.dark [class*="border-[#F5F2E8]"]{ border-color:#262a32 !important; }
+  #shell.dark [class*="border-[#DCD7C6]"]{ border-color:#3a3f4a !important; }
+  #shell.dark [class*="bg-[#F1EEE3]"]{ background-color:#242832 !important; }
+  #shell.dark [class*="bg-[#FAF8F1]"]{ background-color:#20242c !important; }
+  #shell.dark [class*="bg-[#F7F5EF]"]{ background-color:#1a1d23 !important; }
+  #shell.dark [class*="text-[#8a8471]"]{ color:#9a9689 !important; }
+  #shell.dark [class*="text-[#a89f85]"]{ color:#8b8779 !important; }
+  #shell.dark [class*="text-[#635e4d]"]{ color:#b7b3a4 !important; }
+  #shell.dark [class*="text-[#4b4736]"]{ color:#cfcbbc !important; }
+  #shell.dark [class*="text-[#c9c3ac]"]{ color:#6b6f78 !important; }
+  #shell.dark [class*="text-[#21261f]"]{ color:#EDEAE0 !important; }
+  #shell.dark h1, #shell.dark h2, #shell.dark p, #shell.dark span, #shell.dark td, #shell.dark label{ color:inherit; }
+  #shell.dark .inp{ background:#1c2027 !important; border-color:#333844 !important; color:#EDEAE0 !important; }
+  #shell.dark ::placeholder{ color:#6b6f78 !important; }
+  #shell.dark .modal-backdrop ~ *, #shell.dark [class*="bg-[#F7F5EF]"]{ color:inherit; }
+
+  /* --- Cloud Sync (Google Drive Live-Sync) — additive only, does not alter
+     any existing layout/theme rules above. --- */
+  .cloud-dot{ width:7px; height:7px; border-radius:9999px; display:inline-block; flex-shrink:0; }
+  .cloud-dot.on{ background:#22c55e; box-shadow:0 0 0 2px rgba(34,197,94,0.25); }
+  .cloud-dot.off{ background:#9ca3af; }
+  .cloud-dot.busy{ background:#f59e0b; animation:cloudPulse 1s ease-in-out infinite; }
+  @keyframes cloudPulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  .cloud-signin-btn{ background:var(--theme-color); color:#fff; }
+  .cloud-signin-btn:hover{ background:var(--theme-color-dark); }
+  #cloud-offline-banner{ background:#FEF3C7; color:#7c5e10; border:1px solid #FDE68A; }
+  #shell.dark #cloud-offline-banner{ background:#3a2f10; color:#fbd88a; border-color:#5c4a17; }
 </style>
 </head>
 <body class="min-h-screen lg:h-screen lg:overflow-hidden">
+
 
 <div id="shell" class="lg:h-screen lg:flex lg:flex-col lg:overflow-hidden">
 <div id="app" class="flex flex-col lg:flex-row lg:flex-1 lg:min-h-0">
 
   <!-- ===================== SIDEBAR (desktop) ===================== -->
-  <aside class="hidden lg:flex lg:flex-col w-64 shrink-0 lg:h-full bg-white border-r border-[#E7E2D3] scroll-thin overflow-y-auto no-print">
-    <div class="p-4 border-b border-[#E7E2D3] flex items-center gap-3">
+  <aside class="hidden lg:flex lg:flex-col w-64 shrink-0 lg:h-full sidebar-panel border-r sidebar-border scroll-thin overflow-y-auto no-print">
+    <div class="p-4 border-b sidebar-border flex items-center gap-3">
       <div id="sidebar-logo-wrap" class="w-9 h-9 rounded-lg theme-bg flex items-center justify-center text-white font-display font-semibold text-lg overflow-hidden shrink-0">G</div>
       <div class="min-w-0">
         <p class="font-display font-semibold text-[14px] leading-tight truncate" id="sidebar-company-name">Gaia Lake Bungalow</p>
-        <p class="text-[10.5px] text-[#8a8471] font-mono">Asset &amp; Inventory Manager</p>
+        <p class="text-[10.5px] sidebar-muted font-mono">Asset &amp; Inventory Manager</p>
       </div>
     </div>
     <nav class="flex-1 p-2.5 space-y-1" id="sidebar-nav"></nav>
-    <div class="p-3 border-t border-[#E7E2D3] text-[11px] text-[#9c9683] font-mono flex items-center justify-between shrink-0">
-      <span id="sidebar-version">v1.3</span>
+    <div class="p-2.5 border-t sidebar-border shrink-0" id="cloud-sidebar-slot"></div>
+    <div class="p-3 border-t sidebar-border text-[11px] sidebar-muted font-mono flex items-center justify-between shrink-0">
+      <span id="sidebar-version">v1.4</span>
       <span class="grip-dot theme-bg"></span>
     </div>
   </aside>
@@ -102,18 +153,23 @@ or redistribution is strictly prohibited.
   <!-- ===================== MOBILE SLIDE-OVER MENU ===================== -->
   <div id="mobile-menu" class="lg:hidden fixed inset-0 z-40 hidden no-print">
     <div id="mobile-menu-backdrop" class="absolute inset-0 modal-backdrop"></div>
-    <div class="absolute left-0 top-0 bottom-0 w-72 bg-white p-4 overflow-y-auto scroll-thin">
+    <div class="absolute left-0 top-0 bottom-0 w-72 sidebar-panel p-4 overflow-y-auto scroll-thin">
       <div class="flex items-center justify-between mb-4">
         <p class="font-display font-semibold">Menu</p>
         <button id="mobile-menu-close" class="p-1"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
       </div>
       <nav id="mobile-nav" class="space-y-1"></nav>
+      <div class="pt-3 mt-2 border-t sidebar-border" id="cloud-sidebar-slot-mobile"></div>
     </div>
   </div>
 
   <!-- ===================== MAIN ===================== -->
   <main class="flex-1 min-w-0 lg:h-full lg:overflow-y-auto lg:min-h-0 scroll-thin">
     <div class="max-w-[1400px] mx-auto p-4 lg:p-5">
+      <div id="cloud-offline-banner" class="hidden no-print items-center gap-2 text-[12.5px] font-medium rounded-xl px-4 py-2.5 mb-4">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 003.82 21h16.36a2 2 0 001.71-2.96L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        <span>Running Offline: Sign In to sync live database data.</span>
+      </div>
       <div id="view-root"></div>
     </div>
   </main>
@@ -137,7 +193,7 @@ or redistribution is strictly prohibited.
 
 <!-- ===================== VISIBLE FOOTER CREDIT ===================== -->
 <footer class="w-full shrink-0 text-center py-2 lg:py-1.5 text-[11px] lg:text-[10px] text-[#8a8471] bg-[#F7F5EF] border-t border-[#E7E2D3] pb-16 lg:pb-1.5 no-print">
-  Developed by Prasanna Kurukuladithya (Priya) | Gaia Lake Kandalama - Sri Lanka | <span id="footer-version">v1.3</span> | Copyright © 2026. All rights reserved.
+  Developed by Prasanna Kurukuladithya (Priya) | Gaia Lake Kandalama - Sri Lanka | <span id="footer-version">v1.4</span> | Copyright © 2026. All rights reserved.
 </footer>
 </div>
 
@@ -168,15 +224,14 @@ or redistribution is strictly prohibited.
    0. STATIC CONFIG — locations, categories, conditions
 --------------------------------------------------------------------------- */
 const LOCATIONS = [
-  { code:"FR1", name:"Family Room 1",  zone:"Guest Areas" },
-  { code:"TR2", name:"Triple Room 2",  zone:"Guest Areas" },
-  { code:"GR3", name:"Ground Room 3",  zone:"Guest Areas" },
-  { code:"GR4", name:"Ground Room 4",  zone:"Guest Areas" },
-  { code:"POL", name:"Pool",           zone:"Guest Areas" },
+  { code:"R1",  name:"Room 1",         zone:"Guest Areas" },
+  { code:"R2",  name:"Room 2",         zone:"Guest Areas" },
+  { code:"R3",  name:"Room 3",         zone:"Guest Areas" },
+  { code:"R4",  name:"Room 4",         zone:"Guest Areas" },
+  { code:"POOL",name:"Pool",           zone:"Guest Areas" },
   { code:"GDN", name:"Garden",         zone:"Guest Areas" },
   { code:"LBY", name:"Lobby",          zone:"Guest Areas" },
   { code:"GPT", name:"Guest Pantry",   zone:"Guest Areas" },
-  { code:"GDA", name:"Dining Area",    zone:"Guest Areas" },
   { code:"KIT", name:"Main Kitchen",   zone:"Operations" },
   { code:"SR1", name:"Store Room 1",   zone:"Operations" },
   { code:"SR2", name:"Store Room 2",   zone:"Operations" },
@@ -211,8 +266,8 @@ function deriveCategoryCode(name){
 
 const CONDITIONS = [
   { key:"Usable",    cls:"badge-usable",    dot:"#16a34a" },
-  { key:"Damaged",   cls:"badge-damaged",   dot:"#ca8a04" },
-  { key:"In Repair", cls:"badge-repair",    dot:"#ea580c" },
+  { key:"Damaged",   cls:"badge-damaged",   dot:"#FFFF00" },
+  { key:"In Repair", cls:"badge-repair",    dot:"#FF8000" },
   { key:"Discarded", cls:"badge-discarded", dot:"#dc2626" },
   { key:"Missing",   cls:"badge-missing",   dot:"#6b7280" },
 ];
@@ -279,21 +334,21 @@ function idbGet(storeName,key){
 function idbPut(storeName,value){
   return new Promise((resolve,reject)=>{
     const req = tx(storeName,"readwrite").put(value);
-    req.onsuccess = ()=>resolve(value);
+    req.onsuccess = ()=>{ resolve(value); scheduleCloudPush(); };
     req.onerror = (e)=>reject(e.target.error);
   });
 }
 function idbDelete(storeName,key){
   return new Promise((resolve,reject)=>{
     const req = tx(storeName,"readwrite").delete(key);
-    req.onsuccess = ()=>resolve(true);
+    req.onsuccess = ()=>{ resolve(true); scheduleCloudPush(); };
     req.onerror = (e)=>reject(e.target.error);
   });
 }
 function idbClear(storeName){
   return new Promise((resolve,reject)=>{
     const req = tx(storeName,"readwrite").clear();
-    req.onsuccess = ()=>resolve(true);
+    req.onsuccess = ()=>{ resolve(true); scheduleCloudPush(); };
     req.onerror = (e)=>reject(e.target.error);
   });
 }
@@ -427,7 +482,7 @@ const state = {
   history: [],
   settings: {
     companyName:'Gaia Lake Bungalow', address:'Kandalama, Sri Lanka', phone:'', email:'', website:'',
-    currency:'LKR', logo:null, themeColor:'#4c9d38'
+    currency:'LKR', logo:null, themeColor:'#4c9d38', sidebarColor:'#1c2128', darkMode:false
   },
   meta: { version:'1.0', changelog:[] },
   editing: null,                // asset object currently in editor, or null (new)
@@ -435,6 +490,14 @@ const state = {
   splitMode: false,
   printSelection: { location:'all', sortBy:'name' },
   navExpanded: {},
+  cloud: {
+    clientId:'', apiKey:'', folderId:'',           // from Cloud Connection Workspace
+    fileId:null,                                   // Drive file id of gaia_lake_inventory.json once known
+    connected:false, userEmail:null,
+    accessToken:null, tokenExpiresAt:0,
+    syncing:false, applyingRemote:false, lastSync:null, lastRemoteModified:null,
+    dirty:false,
+  },
 };
 
 function assetGroups(){
@@ -500,6 +563,8 @@ async function logHistory(action, item){
    6. VERSION / CHANGELOG ENGINE
 --------------------------------------------------------------------------- */
 const DEFAULT_CHANGELOG = [
+  { version:'1.4', date: nowISO(), type:'major', summary:'Dashboard rebuild, dark mode, and customizable sidebar color.',
+    detail:'Set Damaged to #FFFF00 and In Repair to #FF8000 across badges and charts. Added a search bar to the Dashboard with a live results dropdown. Added an Information section with Last Updated Asset, Last New Item Received, and a Month/Year condition summary card titled "[Month/Year] Summary of Assets and Inventory" — screenshot-ready with its own Download PNG button for sharing reports. Compacted the All-Time condition breakdown into a single chip row and removed the redundant Locations grid (already covered by the sidebar) so the Overview fits one screen without scrolling on desktop. Added a dark, customizable sidebar (color picker in Settings) and a separate app-wide Dark Mode / Light Mode toggle. Fixed a new batch entry incorrectly inheriting its original group\'s creation date.' },
   { version:'1.3', date: nowISO(), type:'major', summary:'Image rendering fix, smarter split workflow, dedicated Print & Export page.',
     detail:'Fixed a bug where a failed item image would corrupt the card markup and render as garbled text instead of a fallback icon. Fixed the Split Item Condition Cancel button, which was silently unbound when a second "back" control existed on the page. Added an explicit close (X) button to the editor header. Reworked the split workflow so every item starts as Usable by default — entering a quantity for any other condition now auto-deducts from Usable, which always equals the group total, with over-allocation blocked. Unified the History table to a single consistent text size and tighter row spacing. Moved Print & PDF Export out of Settings into its own sidebar page, with a live manifest preview table and a View PDF button that opens a full preview in a new tab before downloading.' },
   { version:'1.2', date: nowISO(), type:'major', summary:'One-screen layout, simplified navigation, and reliability fixes.',
@@ -513,7 +578,7 @@ const DEFAULT_CHANGELOG = [
 async function initMeta(){
   let m = await idbGet('meta','version');
   if(!m){
-    m = { key:'version', version:'1.3', changelog: DEFAULT_CHANGELOG };
+    m = { key:'version', version:'1.4', changelog: DEFAULT_CHANGELOG };
     await idbPut('meta', m);
   }
   state.meta.version = m.version;
@@ -568,6 +633,8 @@ async function loadSettings(){
   if(s){ state.settings = Object.assign(state.settings, s); }
   else { await idbPut('settings', Object.assign({key:'main'}, state.settings)); }
   applyTheme(state.settings.themeColor);
+  applySidebarColor(state.settings.sidebarColor);
+  applyDarkMode(!!state.settings.darkMode);
   document.getElementById('sidebar-company-name').textContent = state.settings.companyName || 'Gaia Lake Bungalow';
   renderLogo();
 }
@@ -596,6 +663,27 @@ function applyTheme(hex){
   document.documentElement.style.setProperty('--theme-color-dark', shade(hex,-0.22));
   document.documentElement.style.setProperty('--theme-color-light', tint(hex,0.90));
 }
+function relLuminance(hex){
+  const rgb = hexToRgb(hex).map(c=>{
+    c = c/255;
+    return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
+  });
+  return 0.2126*rgb[0] + 0.7152*rgb[1] + 0.0722*rgb[2];
+}
+function applySidebarColor(hex){
+  if(!/^#([0-9a-fA-F]{6})$/.test(hex)) return;
+  const isDark = relLuminance(hex) < 0.45;
+  const root = document.documentElement.style;
+  root.setProperty('--sidebar-bg', hex);
+  root.setProperty('--sidebar-text', isDark ? '#F3F1E7' : '#21261f');
+  root.setProperty('--sidebar-text-muted', isDark ? 'rgba(243,241,231,0.60)' : 'rgba(33,38,31,0.55)');
+  root.setProperty('--sidebar-hover', isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)');
+  root.setProperty('--sidebar-border', isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)');
+}
+function applyDarkMode(isDark){
+  const shell = document.getElementById('shell');
+  if(shell) shell.classList.toggle('dark', !!isDark);
+}
 function renderLogo(){
   const wrap = document.getElementById('sidebar-logo-wrap');
   if(state.settings.logo){
@@ -610,7 +698,7 @@ function renderLogo(){
 --------------------------------------------------------------------------- */
 function navItemHtml(view, label, iconSvg, extraAttr){
   const active = (state.view===view) || (view.startsWith('loc:') && state.view==='location' && state.activeLocation===view.split(':')[1]);
-  return `<button ${extraAttr||''} data-nav="${view}" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] font-medium transition ${active?'nav-active':'text-[#4b4736] hover:bg-[#F1EEE3]'}">${iconSvg||''}<span class="truncate">${label}</span></button>`;
+  return `<button ${extraAttr||''} data-nav="${view}" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] font-medium transition ${active?'nav-active':'sidebar-item'}">${iconSvg||''}<span class="truncate">${label}</span></button>`;
 }
 
 function buildNavHtml(){
@@ -623,9 +711,9 @@ function buildNavHtml(){
     const isActiveZone = state.view==='location' && zoneLocs.some(l=>l.name===state.activeLocation);
     const expanded = (zone in state.navExpanded) ? state.navExpanded[zone] : isActiveZone;
     const zoneQty = zoneLocs.reduce((s,l)=> s + state.assets.filter(a=>a.location===l.name).length, 0);
-    html += `<button data-zone-toggle="${zone}" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] font-medium text-[#4b4736] hover:bg-[#F1EEE3] transition">
+    html += `<button data-zone-toggle="${zone}" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] font-medium sidebar-item transition">
       ${iconFolder()}<span class="flex-1 text-left truncate">${zone}</span>
-      <span class="text-[10px] font-mono text-[#a89f85]">${zoneQty||''}</span>
+      <span class="text-[10px] font-mono sidebar-muted">${zoneQty||''}</span>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 transition-transform ${expanded?'rotate-90':''}"><path d="M9 18l6-6-6-6"/></svg>
     </button>`;
     if(expanded){
@@ -633,10 +721,10 @@ function buildNavHtml(){
       zoneLocs.forEach(l=>{
         const items = state.assets.filter(a=>a.location===l.name);
         const active = state.view==='location' && state.activeLocation===l.name;
-        html += `<button data-nav="loc:${l.name}" class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] transition ${active?'nav-active':'text-[#635e4d] hover:bg-[#F1EEE3]'}">
+        html += `<button data-nav="loc:${l.name}" class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] transition ${active?'nav-active':'sidebar-item'}">
           <span class="w-1.5 h-1.5 rounded-full shrink-0 ${active?'bg-white':'bg-[#d8d3c0]'}"></span>
           <span class="truncate flex-1 text-left">${l.name}</span>
-          <span class="text-[10px] font-mono ${active?'text-white/80':'text-[#a89f85]'}">${items.length||''}</span>
+          <span class="text-[10px] font-mono ${active?'text-white/80':'sidebar-muted'}">${items.length||''}</span>
         </button>`;
       });
       html += `</div>`;
@@ -697,6 +785,12 @@ document.getElementById('mobile-menu-btn').addEventListener('click', openMobileM
 document.getElementById('mobile-menu-close').addEventListener('click', closeMobileMenu);
 document.getElementById('mobile-menu-backdrop').addEventListener('click', closeMobileMenu);
 document.getElementById('mobile-new-btn').addEventListener('click', ()=>openEditor(null));
+document.addEventListener('click', (ev)=>{
+  const box = document.getElementById('dash-search-results');
+  const input = document.getElementById('dash-search');
+  if(!box || !input) return;
+  if(!box.contains(ev.target) && ev.target!==input){ box.classList.add('hidden'); }
+});
 
 /* ---------------------------------------------------------------------------
    9. MASTER RENDER
@@ -713,6 +807,8 @@ function render(){
   else if(state.view==='settings') root.innerHTML = renderSettingsView();
   bindViewEvents();
   updateA4Preview();
+  renderCloudSidebar();
+  updateCloudBanner();
 }
 function viewTitle(){
   if(state.view==='dashboard') return 'Dashboard';
@@ -727,6 +823,35 @@ function viewTitle(){
 /* ---------------------------------------------------------------------------
    10. DASHBOARD VIEW
 --------------------------------------------------------------------------- */
+function lastUpdatedAsset(){
+  if(!state.assets.length) return null;
+  return state.assets.reduce((latest, a)=> (!latest || new Date(a.lastUpdated) > new Date(latest.lastUpdated)) ? a : latest, null);
+}
+function lastReceivedEntry(){
+  const received = state.history.filter(h=> h.action==='created' || h.action==='batch added');
+  if(!received.length) return null;
+  return received.reduce((latest, h)=> (!latest || new Date(h.date) > new Date(latest.date)) ? h : latest, null);
+}
+function periodConditionSummary(period){
+  const now = new Date();
+  const inPeriod = (iso)=>{
+    const d = new Date(iso);
+    if(isNaN(d)) return false;
+    if(period==='year') return d.getFullYear()===now.getFullYear();
+    return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+  };
+  const counts = {}; CONDITIONS.forEach(c=>counts[c.key]=0);
+  let touched = 0;
+  state.assets.forEach(a=>{
+    if(inPeriod(a.lastUpdated)){ counts[a.condition] = (counts[a.condition]||0) + Number(a.qty||0); touched++; }
+  });
+  return { counts, touched };
+}
+function periodLabel(period){
+  const now = new Date();
+  return period==='year' ? String(now.getFullYear()) : now.toLocaleDateString('en-GB',{month:'long', year:'numeric'});
+}
+
 function renderDashboard(){
   const groups = assetGroups();
   const groupCount = Object.keys(groups).length;
@@ -737,73 +862,138 @@ function renderDashboard(){
   const condCounts = {};
   CONDITIONS.forEach(c=>condCounts[c.key]=0);
   state.assets.forEach(a=>{ condCounts[a.condition] = (condCounts[a.condition]||0) + Number(a.qty||0); });
-  const maxCond = Math.max(1, ...Object.values(condCounts));
 
   const statCard = (label, value, sub)=>`
-    <div class="bg-white rounded-2xl border border-[#E7E2D3] p-5">
-      <p class="text-[11px] uppercase tracking-wider font-semibold text-[#a89f85]">${label}</p>
-      <p class="font-display text-3xl font-semibold mt-1">${value}</p>
-      ${sub?`<p class="text-xs text-[#8a8471] mt-1">${sub}</p>`:''}
+    <div class="bg-white rounded-2xl border border-[#E7E2D3] p-4">
+      <p class="text-[10.5px] uppercase tracking-wider font-semibold text-[#a89f85]">${label}</p>
+      <p class="font-display text-2xl font-semibold mt-0.5">${value}</p>
+      ${sub?`<p class="text-[11px] text-[#8a8471] mt-0.5">${sub}</p>`:''}
     </div>`;
 
-  const zoneCards = ZONES.map(zone=>{
-    const locs = LOCATIONS.filter(l=>l.zone===zone);
-    return `<div class="bg-white rounded-2xl border border-[#E7E2D3] overflow-hidden">
-      <div class="px-4 py-3 border-b border-[#EFEBDD] theme-tint">
-        <p class="font-display font-semibold text-sm theme-text">${zone}</p>
-      </div>
-      <div class="divide-y divide-[#F1EEE3]">
-        ${locs.map(l=>{
-          const items = state.assets.filter(a=>a.location===l.name);
-          const q = items.reduce((s,a)=>s+Number(a.qty||0),0);
-          return `<button data-nav="loc:${l.name}" class="w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-[#FAF8F1] text-left">
-            <span>${l.name}</span>
-            <span class="font-mono text-xs text-[#a89f85]">${q} pcs</span>
-          </button>`;
-        }).join('')}
+  const lastUpdated = lastUpdatedAsset();
+  const lastReceived = lastReceivedEntry();
+  const period = periodConditionSummary(dashPeriod);
+  const maxPeriod = Math.max(1, ...Object.values(period.counts));
+
+  const infoCard = (title, entry, emptyMsg)=>{
+    if(!entry) return `<div class="bg-white rounded-2xl border border-[#E7E2D3] p-4">
+      <p class="text-[10.5px] uppercase tracking-wider font-semibold text-[#a89f85] mb-2">${title}</p>
+      <p class="text-xs text-[#a89f85]">${emptyMsg}</p>
+    </div>`;
+    const name = entry.name || entry.itemName;
+    return `<div class="bg-white rounded-2xl border border-[#E7E2D3] p-4">
+      <p class="text-[10.5px] uppercase tracking-wider font-semibold text-[#a89f85] mb-2">${title}</p>
+      <p class="font-display font-semibold text-sm truncate">${escapeHtml(name)}</p>
+      <p class="text-[11px] font-mono text-[#a89f85] mt-0.5">${entry.assetNumber}</p>
+      <div class="flex items-center justify-between mt-2 text-xs">
+        <span class="text-[#8a8471]">Qty <span class="font-mono font-semibold text-[#21261f]">${entry.qty}</span></span>
+        <span class="text-[#8a8471]">${fmtDate(entry.lastUpdated || entry.date)}</span>
       </div>
     </div>`;
-  }).join('');
+  };
 
   return `
-  <div class="space-y-6">
+  <div class="space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 class="font-display text-2xl lg:text-3xl font-semibold">Overview</h1>
-        <p class="text-sm text-[#8a8471] mt-0.5">${state.settings.companyName} — live inventory snapshot</p>
+        <h1 class="font-display text-xl lg:text-2xl font-semibold">Overview</h1>
+        <p class="text-xs text-[#8a8471] mt-0.5">${escapeHtml(state.settings.companyName)} — live inventory snapshot</p>
       </div>
-      <button data-action="new-item" class="hidden lg:flex items-center gap-2 theme-bg text-white px-4 py-2.5 rounded-xl text-sm font-medium">
+      <button data-action="new-item" class="hidden lg:flex items-center gap-2 theme-bg text-white px-4 py-2 rounded-xl text-sm font-medium">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New Item
       </button>
     </div>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="relative">
+      <div class="relative">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#a89f85]"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="dash-search" type="text" value="${escapeHtml(dashSearch)}" placeholder="Search by name or asset number…" class="inp pl-10"/>
+      </div>
+      <div id="dash-search-results" class="${dashSearch?'':'hidden'} absolute z-20 mt-1.5 w-full bg-white rounded-xl border border-[#E7E2D3] shadow-lg overflow-hidden">${dashboardSearchResultsHtml(dashSearch)}</div>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
       ${statCard('Asset Groups', groupCount)}
       ${statCard('Total Quantity', totalQty+' pcs')}
       ${statCard('Usable Quantity', usableQty+' pcs', totalQty? Math.round(usableQty/totalQty*100)+'% of total':'')}
       ${statCard('Total Purchase Value', fmtMoney(totalValue))}
     </div>
 
-    <div class="bg-white rounded-2xl border border-[#E7E2D3] p-5">
-      <p class="font-display font-semibold mb-4">Condition Breakdown</p>
-      <div class="space-y-3">
-        ${CONDITIONS.map(c=>{
-          const val = condCounts[c.key]||0;
-          const pct = Math.round(val/maxCond*100);
-          return `<div class="flex items-center gap-3">
-            <span class="w-20 text-xs font-medium shrink-0">${c.key}</span>
-            <div class="flex-1 h-2.5 rounded-full bg-[#F1EEE3] overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%; background:${c.dot}"></div></div>
-            <span class="w-10 text-right text-xs font-mono text-[#8a8471]">${val}</span>
-          </div>`;
-        }).join('')}
+    <div>
+      <p class="font-display font-semibold text-sm mb-2">Information</p>
+      <div class="grid md:grid-cols-3 gap-3">
+        ${infoCard('Last Updated Asset', lastUpdated, 'No assets yet.')}
+        ${infoCard('Last New Item Received', lastReceived, 'Nothing received yet.')}
+        <div id="dash-summary-card" class="bg-white rounded-2xl border border-[#E7E2D3] p-4">
+          <div class="flex items-start justify-between mb-3 gap-2">
+            <div class="min-w-0">
+              <p class="font-display font-semibold text-sm truncate">${dashPeriod==='year'?periodLabel('year'):periodLabel('month')} Summary of Assets and Inventory</p>
+              <p class="text-[10.5px] text-[#a89f85] truncate">${escapeHtml(state.settings.companyName)}</p>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0 no-capture">
+              <div class="flex rounded-lg border border-[#E2DFD3] overflow-hidden text-[10px] font-medium shrink-0">
+                <button data-period="month" class="px-2 py-1 ${dashPeriod==='month'?'theme-bg text-white':'hover:bg-[#F1EEE3]'}">Month</button>
+                <button data-period="year" class="px-2 py-1 ${dashPeriod==='year'?'theme-bg text-white':'hover:bg-[#F1EEE3]'}">Year</button>
+              </div>
+              <button id="dash-summary-download" title="Download as image" class="p-1.5 rounded-lg border border-[#E2DFD3] hover:bg-[#F1EEE3]">${iconDownload()}</button>
+            </div>
+          </div>
+          ${period.touched ? `<div class="space-y-1.5">${CONDITIONS.map(c=>{
+            const val = period.counts[c.key]||0;
+            const pct = Math.round(val/maxPeriod*100);
+            return `<div class="flex items-center gap-2">
+              <span class="w-14 text-[10.5px] font-medium shrink-0">${c.key}</span>
+              <div class="flex-1 h-2 rounded-full bg-[#F1EEE3] overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%; background:${c.dot}"></div></div>
+              <span class="w-6 text-right text-[10.5px] font-mono text-[#8a8471]">${val}</span>
+            </div>`;
+          }).join('')}</div>` : `<p class="text-xs text-[#a89f85]">No activity ${dashPeriod==='year'?'this year':'this month'} yet.</p>`}
+        </div>
       </div>
     </div>
 
-    <div>
-      <p class="font-display font-semibold mb-3">Locations</p>
-      <div class="grid md:grid-cols-3 gap-4">${zoneCards}</div>
+    <div class="bg-white rounded-2xl border border-[#E7E2D3] p-4">
+      <p class="font-display font-semibold text-sm mb-2.5">All-Time Condition Breakdown</p>
+      <div class="flex flex-wrap gap-2">
+        ${CONDITIONS.map(c=>{
+          const val = condCounts[c.key]||0;
+          return `<span class="inline-flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-full text-xs font-medium ${c.cls}">
+            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${c.dot}"></span>${c.key} <span class="font-mono font-semibold">${val}</span>
+          </span>`;
+        }).join('')}
+      </div>
     </div>
   </div>`;
+}
+function dashboardSearchResultsHtml(query){
+  if(!query) return '';
+  const q = query.toLowerCase();
+  const matches = state.assets.filter(a=> (a.name||'').toLowerCase().includes(q) || (a.assetNumber||'').toLowerCase().includes(q)).slice(0,8);
+  if(!matches.length) return `<div class="px-4 py-3 text-xs text-[#a89f85]">No items match "${escapeHtml(query)}".</div>`;
+  return matches.map(a=>{
+    const c = condMeta(a.condition);
+    return `<button data-search-result="${a.id}" class="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-[#FAF8F1] border-b border-[#F5F2E8] last:border-0">
+      <div class="min-w-0">
+        <p class="font-medium truncate">${escapeHtml(a.name)}</p>
+        <p class="text-[11px] font-mono text-[#a89f85]">${a.assetNumber} · ${escapeHtml(a.location)}</p>
+      </div>
+      <span class="text-[11px] px-2 py-0.5 rounded-full shrink-0 ${c.cls}">${a.condition}</span>
+    </button>`;
+  }).join('');
+}
+function refreshDashboardSearch(){
+  const box = document.getElementById('dash-search-results');
+  if(!box) return;
+  box.innerHTML = dashboardSearchResultsHtml(dashSearch);
+  box.classList.toggle('hidden', !dashSearch);
+  bindDashboardSearchResultClicks();
+}
+function bindDashboardSearchResultClicks(){
+  document.querySelectorAll('[data-search-result]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const item = state.assets.find(a=>a.id===b.getAttribute('data-search-result'));
+      if(item) openEditor(item);
+    });
+  });
 }
 
 /* ---------------------------------------------------------------------------
@@ -1145,6 +1335,7 @@ async function saveStandardItem(){
   readFormIntoEditing();
   const e = state.editing;
   if(!e.name){ showToast('Asset name is required.','error'); return; }
+  const isNewEntry = !e.id;
 
   if(!e.assetNumber){
     e.assetNumber = await nextAssetNumber(e.location, e.category);
@@ -1157,7 +1348,8 @@ async function saveStandardItem(){
   const idx = state.assets.findIndex(a=>a.id===e.id);
   if(idx>=0) state.assets[idx] = e; else state.assets.push(e);
 
-  await logHistory(e.id ? 'updated' : 'created', e);
+  const actionLabel = isNewEntry ? (state.editorIsBatch ? 'batch added' : 'created') : 'updated';
+  await logHistory(actionLabel, e);
   showToast('Item saved successfully.');
   navigateTo('location', e.location);
 }
@@ -1229,6 +1421,19 @@ function bindViewEvents(){
     });
   });
 
+  // dashboard search & period toggle
+  const dashSearchInput = document.getElementById('dash-search');
+  if(dashSearchInput){
+    dashSearchInput.addEventListener('input', debounce(()=>{ dashSearch = dashSearchInput.value; refreshDashboardSearch(); }, 150));
+    dashSearchInput.addEventListener('focus', refreshDashboardSearch);
+  }
+  bindDashboardSearchResultClicks();
+  document.querySelectorAll('[data-period]').forEach(b=>{
+    b.addEventListener('click', ()=>{ dashPeriod = b.getAttribute('data-period'); render(); });
+  });
+  const summaryDownloadBtn = document.getElementById('dash-summary-download');
+  if(summaryDownloadBtn) summaryDownloadBtn.addEventListener('click', downloadSummaryCardImage);
+
   // location card actions
   document.querySelectorAll('[data-edit-entry]').forEach(b=>b.addEventListener('click', ()=>{
     const id = b.getAttribute('data-edit-entry');
@@ -1269,7 +1474,7 @@ function bindViewEvents(){
   document.querySelectorAll('[data-batch]').forEach(b=>b.addEventListener('click', ()=>{
     const base = b.getAttribute('data-batch');
     const rep = state.assets.find(a=>a.assetNumber===base);
-    const batchEntry = Object.assign({}, rep, { id:null, qty:1, condition:'Usable', purchaseDate:new Date().toISOString().slice(0,10) });
+    const batchEntry = Object.assign({}, rep, { id:null, qty:1, condition:'Usable', purchaseDate:new Date().toISOString().slice(0,10), createdAt:null, lastUpdated:null });
     openEditor(batchEntry, { batch:true, baseAssetNumber: base });
   }));
 
@@ -1351,23 +1556,28 @@ function bindViewEvents(){
 --------------------------------------------------------------------------- */
 let historySearch = '';
 let historySort = 'date_desc';
+let dashSearch = '';
+let dashPeriod = 'month';
 
 function renderHistoryView(){
   const rows = filterSortHistory();
   return `
-  <div class="space-y-5">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h1 class="font-display text-2xl font-semibold">History</h1>
-      <div class="flex gap-2">
-        <input id="hist-search" type="text" placeholder="Search history…" value="${escapeHtml(historySearch)}" class="inp w-52"/>
-        <select id="hist-sort" class="inp w-40">
-          <option value="date_desc" ${historySort==='date_desc'?'selected':''}>Newest First</option>
-          <option value="date_asc" ${historySort==='date_asc'?'selected':''}>Oldest First</option>
-          <option value="name" ${historySort==='name'?'selected':''}>Item Name</option>
-          <option value="location" ${historySort==='location'?'selected':''}>Location</option>
-          <option value="category" ${historySort==='category'?'selected':''}>Category</option>
-        </select>
+  <div class="space-y-4">
+    <div>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h1 class="font-display text-2xl font-semibold">History</h1>
+        <div class="flex gap-2">
+          <input id="hist-search" type="text" placeholder="Search history…" value="${escapeHtml(historySearch)}" class="inp w-52"/>
+          <select id="hist-sort" class="inp w-40">
+            <option value="date_desc" ${historySort==='date_desc'?'selected':''}>Newest First</option>
+            <option value="date_asc" ${historySort==='date_asc'?'selected':''}>Oldest First</option>
+            <option value="name" ${historySort==='name'?'selected':''}>Item Name</option>
+            <option value="location" ${historySort==='location'?'selected':''}>Location</option>
+            <option value="category" ${historySort==='category'?'selected':''}>Category</option>
+          </select>
+        </div>
       </div>
+      <p class="text-xs text-[#8a8471] mt-1.5">This is a running log of every action taken over time, so the same item can appear more than once. For an item's <span class="font-semibold">current</span> quantities, open it on its Location page — quantities here reflect what was true at the moment each entry was logged.</p>
     </div>
     <div class="bg-white rounded-2xl border border-[#E7E2D3] overflow-x-auto">
       <table class="w-full text-xs min-w-[900px]">
@@ -1378,32 +1588,33 @@ function renderHistoryView(){
             <th class="px-4 py-2.5">Date</th><th class="px-4 py-2.5 text-right">Options</th>
           </tr>
         </thead>
-        <tbody>
-          ${rows.length ? rows.map(h=>{
-            const c = condMeta(h.condition);
-            return `<tr class="border-b border-[#F5F2E8] last:border-0 hover:bg-[#FAF8F1]">
-              <td class="px-4 py-2">${escapeHtml(h.itemName)}</td>
-              <td class="px-4 py-2 font-mono">${h.assetNumber}</td>
-              <td class="px-4 py-2">${escapeHtml(h.category)}</td>
-              <td class="px-4 py-2">${escapeHtml(h.location)}</td>
-              <td class="px-4 py-2 font-mono">${h.qty}</td>
-              <td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full ${c.cls}">${h.condition}</span></td>
-              <td class="px-4 py-2 capitalize">${h.action}</td>
-              <td class="px-4 py-2 text-[#8a8471]">${fmtDate(h.date)}</td>
-              <td class="px-4 py-2">
-                <div class="flex justify-end gap-1">
-                  <button data-hist-open="${h.id}" class="p-1.5 rounded-lg hover:bg-[#F1EEE3]" title="Open">${iconEye()}</button>
-                  <button data-hist-print="${h.id}" class="p-1.5 rounded-lg hover:bg-[#F1EEE3]" title="Print">${iconPrinter()}</button>
-                  <button data-hist-pdf="${h.id}" class="p-1.5 rounded-lg hover:bg-[#F1EEE3]" title="Export PDF">${iconDownload()}</button>
-                  <button data-hist-del="${h.id}" class="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="Delete Record">${iconTrash()}</button>
-                </div>
-              </td>
-            </tr>`;
-          }).join('') : `<tr><td colspan="9" class="px-4 py-10 text-center text-[#8a8471]">No history records found.</td></tr>`}
-        </tbody>
+        <tbody id="hist-tbody">${historyRowsHtml(rows)}</tbody>
       </table>
     </div>
   </div>`;
+}
+function historyRowsHtml(rows){
+  return rows.length ? rows.map(h=>{
+    const c = condMeta(h.condition);
+    return `<tr class="border-b border-[#F5F2E8] last:border-0 hover:bg-[#FAF8F1]">
+      <td class="px-4 py-2">${escapeHtml(h.itemName)}</td>
+      <td class="px-4 py-2 font-mono">${h.assetNumber}</td>
+      <td class="px-4 py-2">${escapeHtml(h.category)}</td>
+      <td class="px-4 py-2">${escapeHtml(h.location)}</td>
+      <td class="px-4 py-2 font-mono">${h.qty}</td>
+      <td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full ${c.cls}">${h.condition}</span></td>
+      <td class="px-4 py-2 capitalize">${h.action}</td>
+      <td class="px-4 py-2 text-[#8a8471]">${fmtDate(h.date)}</td>
+      <td class="px-4 py-2">
+        <div class="flex justify-end gap-1">
+          <button data-hist-open="${h.id}" class="p-1.5 rounded-lg hover:bg-[#F1EEE3]" title="Open">${iconEye()}</button>
+          <button data-hist-print="${h.id}" class="p-1.5 rounded-lg hover:bg-[#F1EEE3]" title="Print">${iconPrinter()}</button>
+          <button data-hist-pdf="${h.id}" class="p-1.5 rounded-lg hover:bg-[#F1EEE3]" title="Export PDF">${iconDownload()}</button>
+          <button data-hist-del="${h.id}" class="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="Delete Record">${iconTrash()}</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="9" class="px-4 py-10 text-center text-[#8a8471]">No history records found.</td></tr>`;
 }
 function iconEye(){ return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`; }
 function iconPrinter(){ return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`; }
@@ -1424,12 +1635,20 @@ function filterSortHistory(){
   }
   return rows;
 }
+function refreshHistoryTable(){
+  const tbody = document.getElementById('hist-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = historyRowsHtml(filterSortHistory());
+  bindHistoryRowActions();
+}
 function bindHistoryEvents(){
   const s = document.getElementById('hist-search');
-  if(s) s.addEventListener('input', debounce(()=>{ historySearch = s.value; render(); }, 200));
+  if(s) s.addEventListener('input', debounce(()=>{ historySearch = s.value; refreshHistoryTable(); }, 150));
   const so = document.getElementById('hist-sort');
-  if(so) so.addEventListener('change', ()=>{ historySort = so.value; render(); });
-
+  if(so) so.addEventListener('change', ()=>{ historySort = so.value; refreshHistoryTable(); });
+  bindHistoryRowActions();
+}
+function bindHistoryRowActions(){
   document.querySelectorAll('[data-hist-open]').forEach(b=>b.addEventListener('click', ()=>{
     const rec = state.history.find(h=>h.id===b.getAttribute('data-hist-open'));
     if(!rec) return;
@@ -1527,6 +1746,50 @@ function renderSettingsView(){
         <input id="s-color-picker" type="color" value="${s.themeColor}" class="w-12 h-12 rounded-lg border border-[#E2DFD3] cursor-pointer"/>
         <input id="s-color-hex" type="text" value="${s.themeColor}" class="inp font-mono w-40"/>
       </div>
+    </section>
+
+    <section class="bg-white rounded-2xl border border-[#E7E2D3] p-5 space-y-4">
+      <p class="font-display font-semibold uppercase tracking-wide text-sm">Menu Bar Color</p>
+      <p class="text-xs text-[#8a8471] -mt-2">Colors the left sidebar and mobile menu. Text automatically switches between light and dark for readability.</p>
+      <div class="flex items-center gap-3">
+        <input id="s-sidebar-color-picker" type="color" value="${s.sidebarColor}" class="w-12 h-12 rounded-lg border border-[#E2DFD3] cursor-pointer"/>
+        <input id="s-sidebar-color-hex" type="text" value="${s.sidebarColor}" class="inp font-mono w-40"/>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl border border-[#E7E2D3] p-5 space-y-4">
+      <p class="font-display font-semibold uppercase tracking-wide text-sm">Appearance</p>
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium">${s.darkMode ? 'Dark Mode' : 'Light Mode'}</p>
+          <p class="text-xs text-[#8a8471]">Switch the app's overall background and text between light and dark.</p>
+        </div>
+        <button id="s-dark-toggle" role="switch" aria-checked="${s.darkMode?'true':'false'}" class="relative w-12 h-7 rounded-full transition shrink-0 ${s.darkMode?'theme-bg':'bg-[#E2DFD3]'}">
+          <span class="absolute top-1 ${s.darkMode?'left-6':'left-1'} w-5 h-5 rounded-full bg-white shadow transition-all"></span>
+        </button>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl border border-[#E7E2D3] p-5 space-y-4">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <p class="font-display font-semibold">Cloud Connection Workspace — Google Drive Live-Sync</p>
+        <span id="cloud-status-pill" class="text-[11px] font-mono px-2.5 py-1 rounded-full flex items-center gap-1.5 bg-[#F1EEE3]">
+          <span class="cloud-dot ${state.cloud.connected?(state.cloud.syncing?'busy':'on'):'off'}" id="cloud-status-dot"></span><span id="cloud-status-text">${state.cloud.connected?(state.cloud.syncing?'Syncing…':'Synced'):'Offline'}</span>
+        </span>
+      </div>
+      <p class="text-xs text-[#8a8471]">Connect a shared Google Drive folder so every authorized device reads and writes the exact same live database file (<code class="font-mono">gaia_lake_inventory.json</code>). Generate a Client ID and API Key from your own <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" class="theme-text underline">Google Cloud Console</a>, and copy the folder ID from your Drive shared-folder link.</p>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div><label class="lbl">Google Client ID</label><input id="s-cloud-client-id" type="text" class="inp font-mono" placeholder="xxxxxxxx.apps.googleusercontent.com" value="${escapeHtml(state.cloud.clientId||'')}"/></div>
+        <div><label class="lbl">Google API Key</label><input id="s-cloud-api-key" type="text" class="inp font-mono" placeholder="AIza..." value="${escapeHtml(state.cloud.apiKey||'')}"/></div>
+        <div class="sm:col-span-2"><label class="lbl">Target Shared Folder ID</label><input id="s-cloud-folder-id" type="text" class="inp font-mono" placeholder="1AbCDefGhIJkLmnOPqrsTUvwxYZ..." value="${escapeHtml(state.cloud.folderId||'')}"/></div>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button id="s-cloud-save" class="px-4 py-2.5 rounded-xl border border-[#E2DFD3] text-sm font-medium hover:bg-[#F1EEE3]">Save Configuration</button>
+        <button id="s-cloud-signin" class="px-4 py-2.5 rounded-xl cloud-signin-btn text-sm font-medium">${state.cloud.connected ? 'Sign Out' : 'Sign In with Google'}</button>
+        <button id="s-cloud-sync-now" class="px-4 py-2.5 rounded-xl border border-[#E2DFD3] text-sm font-medium hover:bg-[#F1EEE3] ${state.cloud.connected?'':'hidden'}" ${state.cloud.connected?'':'disabled'}>Sync Now</button>
+        ${state.cloud.userEmail ? `<span class="text-xs text-[#8a8471]">Signed in as ${escapeHtml(state.cloud.userEmail)}</span>` : ''}
+      </div>
+      <p class="text-[11px] text-[#a89f85]">${state.cloud.lastSync ? 'Last synced ' + fmtDateTime(new Date(state.cloud.lastSync)) : 'Not yet synced with the shared folder.'}</p>
     </section>
 
     <section class="bg-white rounded-2xl border border-[#E7E2D3] p-5 space-y-4">
@@ -1674,9 +1937,42 @@ function bindSettingsEvents(){
     }
   });
 
+  bind('s-sidebar-color-picker','input', async (e)=>{
+    const hex = e.target.value;
+    document.getElementById('s-sidebar-color-hex').value = hex;
+    applySidebarColor(hex); state.settings.sidebarColor = hex; await saveSettingsToDB();
+  });
+  bind('s-sidebar-color-hex','keydown', async (e)=>{
+    if(e.key==='Enter'){
+      const hex = e.target.value.trim();
+      if(/^#([0-9a-fA-F]{6})$/.test(hex)){
+        document.getElementById('s-sidebar-color-picker').value = hex;
+        applySidebarColor(hex); state.settings.sidebarColor = hex; await saveSettingsToDB();
+        showToast('Menu bar color updated.');
+      } else showToast('Enter a valid hex color, e.g. #1C2128','error');
+    }
+  });
+
+  bind('s-dark-toggle','click', async ()=>{
+    state.settings.darkMode = !state.settings.darkMode;
+    applyDarkMode(state.settings.darkMode);
+    await saveSettingsToDB();
+    render();
+  });
+
   bind('s-export','click', exportAllData);
   bind('s-import','change', importAllData);
   bind('s-whatsnew','click', downloadWhatsNew);
+
+  bind('s-cloud-save','click', async ()=>{
+    state.cloud.clientId = (document.getElementById('s-cloud-client-id').value||'').trim();
+    state.cloud.apiKey = (document.getElementById('s-cloud-api-key').value||'').trim();
+    state.cloud.folderId = (document.getElementById('s-cloud-folder-id').value||'').trim();
+    await saveCloudConfigToDB();
+    showToast('Cloud connection settings saved.');
+  });
+  bind('s-cloud-signin','click', ()=>{ state.cloud.connected ? cloudSignOut() : cloudSignIn(); });
+  bind('s-cloud-sync-now','click', ()=>cloudManualSync());
 }
 
 function bindPrintViewEvents(){
@@ -1749,6 +2045,307 @@ async function importAllData(e){
     showToast('Import failed: '+err.message,'error');
   }
   e.target.value = '';
+}
+
+/* ---------------------------------------------------------------------------
+   18b. CLOUD SYNC — GOOGLE DRIVE LIVE-SYNC (Strategy 2)
+   Centralized cloud storage layered on top of the existing IndexedDB layer.
+   IndexedDB remains the fast local read/write cache; this module mirrors
+   every change to a single master JSON file (gaia_lake_inventory.json) in
+   the user's own Google Drive shared folder, and pulls remote changes made
+   by other authorized devices. Nothing here alters the CSS layout, print
+   engine, version tracking, or image compression logic above.
+--------------------------------------------------------------------------- */
+const CLOUD_FILE_NAME = 'gaia_lake_inventory.json';
+const CLOUD_SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/userinfo.email';
+const CLOUD_POLL_MS = 20000;
+
+let gisTokenClient = null;
+let cloudPushTimer = null;
+let cloudPollTimer = null;
+let cloudRefreshTimer = null;
+
+function ensureGisReady(){
+  return typeof google !== 'undefined' && google.accounts && google.accounts.oauth2;
+}
+
+async function loadCloudConfig(){
+  const c = await idbGet('settings','cloud');
+  if(c){
+    state.cloud.clientId = c.clientId || '';
+    state.cloud.apiKey = c.apiKey || '';
+    state.cloud.folderId = c.folderId || '';
+    state.cloud.fileId = c.fileId || null;
+  }
+}
+async function saveCloudConfigToDB(){
+  await idbPut('settings', {
+    key:'cloud', clientId: state.cloud.clientId, apiKey: state.cloud.apiKey,
+    folderId: state.cloud.folderId, fileId: state.cloud.fileId
+  });
+}
+
+/* ---- Sidebar widget + offline banner ------------------------------------- */
+function renderCloudSidebarHtml(){
+  const c = state.cloud;
+  if(c.connected){
+    return `<div class="flex items-center gap-2 px-1 mb-2 text-[11px] sidebar-muted">
+        <span class="cloud-dot ${c.syncing?'busy':'on'}" id="cloud-dot-sidebar"></span>
+        <span class="truncate flex-1">${c.syncing?'Syncing…':'Live-synced'}${c.userEmail?' · '+escapeHtml(c.userEmail):''}</span>
+        <button data-cloud-refresh class="p-1 rounded hover:bg-white/10 shrink-0" title="Sync now" aria-label="Sync now">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.64-6.36M21 3v6h-6"/></svg>
+        </button>
+      </div>
+      <button data-cloud-signout class="w-full text-[12px] px-3 py-2 rounded-lg border sidebar-border sidebar-item text-center">Sign Out</button>`;
+  }
+  return `<button data-cloud-signin class="w-full flex items-center justify-center gap-2 text-[12.5px] font-medium px-3 py-2.5 rounded-lg cloud-signin-btn">
+      <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.2-7.27 3.09 0 4.9 1.97 4.9 1.97L19 4.72S16.56 2 12.1 2C6.42 2 2.03 6.8 2.03 12c0 5.05 4.13 10 10.22 10 5.35 0 9.25-3.67 9.25-9.09 0-1.15-.15-1.81-.15-1.81z"/></svg>
+      Sign In with Google
+    </button>
+    <p class="text-[10.5px] sidebar-muted mt-1.5 px-1">Offline — connect your Drive shared folder in Settings.</p>`;
+}
+function renderCloudSidebar(){
+  const html = renderCloudSidebarHtml();
+  const a = document.getElementById('cloud-sidebar-slot'); if(a) a.innerHTML = html;
+  const b = document.getElementById('cloud-sidebar-slot-mobile'); if(b) b.innerHTML = html;
+  document.querySelectorAll('[data-cloud-signin]').forEach(el=>el.addEventListener('click', cloudSignIn));
+  document.querySelectorAll('[data-cloud-signout]').forEach(el=>el.addEventListener('click', cloudSignOut));
+  document.querySelectorAll('[data-cloud-refresh]').forEach(el=>el.addEventListener('click', cloudManualSync));
+}
+function updateCloudBanner(){
+  const banner = document.getElementById('cloud-offline-banner');
+  if(!banner) return;
+  const show = !state.cloud.connected || !navigator.onLine;
+  banner.classList.toggle('hidden', !show);
+  banner.classList.toggle('flex', show);
+}
+function setCloudStatus(kind, text){
+  const dot = document.getElementById('cloud-status-dot');
+  const label = document.getElementById('cloud-status-text');
+  if(dot) dot.className = 'cloud-dot ' + kind;
+  if(label) label.textContent = text;
+  const sideDot = document.getElementById('cloud-dot-sidebar');
+  if(sideDot) sideDot.className = 'cloud-dot ' + kind;
+}
+
+/* ---- OAuth (Google Identity Services) ------------------------------------ */
+function attemptSilentCloudSignIn(){
+  if(!state.cloud.clientId || !state.cloud.folderId){ updateCloudBanner(); return; }
+  let tries = 0;
+  const poll = setInterval(()=>{
+    tries++;
+    if(ensureGisReady()){
+      clearInterval(poll);
+      try{
+        gisTokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: state.cloud.clientId, scope: CLOUD_SCOPES,
+          callback: onCloudTokenResponse,
+          error_callback: ()=>{ updateCloudBanner(); }
+        });
+        gisTokenClient.__clientId = state.cloud.clientId;
+        gisTokenClient.requestAccessToken({ prompt:'none' });
+      }catch(e){ updateCloudBanner(); }
+    } else if(tries > 25){ clearInterval(poll); updateCloudBanner(); }
+  }, 200);
+}
+function cloudSignIn(){
+  if(!state.cloud.clientId || !state.cloud.folderId){
+    showToast('Enter and save your Google Client ID and Shared Folder ID in Settings first.','error');
+    navigateTo('settings'); return;
+  }
+  if(!ensureGisReady()){
+    showToast('Google Sign-In library is still loading — please try again in a moment.','error'); return;
+  }
+  if(!gisTokenClient || gisTokenClient.__clientId !== state.cloud.clientId){
+    gisTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: state.cloud.clientId, scope: CLOUD_SCOPES,
+      callback: onCloudTokenResponse,
+      error_callback: (err)=>{ showToast('Google Sign-In failed: '+(err&&err.type?err.type:'unknown error'),'error'); }
+    });
+    gisTokenClient.__clientId = state.cloud.clientId;
+  }
+  gisTokenClient.requestAccessToken({ prompt:'consent' });
+}
+async function onCloudTokenResponse(resp){
+  if(!resp || !resp.access_token){ showToast('Google Sign-In did not return an access token.','error'); return; }
+  state.cloud.accessToken = resp.access_token;
+  state.cloud.tokenExpiresAt = Date.now() + (Number(resp.expires_in||3600)*1000) - 60000;
+  state.cloud.connected = true;
+  scheduleTokenRefresh();
+  try{
+    const profile = await driveFetchJson('https://www.googleapis.com/oauth2/v3/userinfo');
+    state.cloud.userEmail = profile && profile.email ? profile.email : null;
+  }catch(e){ /* non-fatal — email is cosmetic only */ }
+  showToast('Signed in to Google Drive.');
+  await cloudInitialConnect();
+}
+function scheduleTokenRefresh(){
+  clearTimeout(cloudRefreshTimer);
+  const ms = Math.max(5000, state.cloud.tokenExpiresAt - Date.now());
+  cloudRefreshTimer = setTimeout(()=>{ if(gisTokenClient) gisTokenClient.requestAccessToken({ prompt:'' }); }, ms);
+}
+function cloudSignOut(){
+  try{ if(state.cloud.accessToken && ensureGisReady()) google.accounts.oauth2.revoke(state.cloud.accessToken, ()=>{}); }catch(e){}
+  state.cloud.connected = false; state.cloud.accessToken = null; state.cloud.userEmail = null;
+  clearTimeout(cloudRefreshTimer); clearInterval(cloudPollTimer);
+  setCloudStatus('off','Offline');
+  showToast('Signed out of Google Drive.','info');
+  render();
+}
+
+/* ---- Drive REST helpers (fetch + Bearer token; no gapi.client needed) ---- */
+async function driveFetchJson(url, opts){
+  opts = opts || {};
+  const headers = Object.assign({}, opts.headers||{}, { Authorization: 'Bearer '+state.cloud.accessToken });
+  const res = await fetch(url, Object.assign({}, opts, { headers }));
+  if(!res.ok){
+    const errText = await res.text().catch(()=> '');
+    throw new Error(`Drive API ${res.status}: ${errText.slice(0,200)}`);
+  }
+  const ct = res.headers.get('content-type')||'';
+  return ct.includes('application/json') ? res.json() : res.text();
+}
+async function findMasterFile(){
+  const q = encodeURIComponent(`name='${CLOUD_FILE_NAME}' and '${state.cloud.folderId}' in parents and trashed=false`);
+  const data = await driveFetchJson(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime)&spaces=drive`);
+  return (data.files && data.files[0]) || null;
+}
+async function createMasterFile(payload){
+  const boundary = 'gaiaLakeBoundary' + Date.now();
+  const metadata = { name: CLOUD_FILE_NAME, parents:[state.cloud.folderId], mimeType:'application/json' };
+  const body =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(payload)}\r\n` +
+    `--${boundary}--`;
+  return driveFetchJson('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime', {
+    method:'POST', headers:{ 'Content-Type': `multipart/related; boundary=${boundary}` }, body
+  });
+}
+async function updateMasterFile(fileId, payload){
+  return driveFetchJson(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=id,modifiedTime`, {
+    method:'PATCH', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload)
+  });
+}
+async function downloadMasterFile(fileId){
+  return driveFetchJson(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+}
+async function getMasterFileMeta(fileId){
+  return driveFetchJson(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`);
+}
+
+/* ---- Payload build / apply ------------------------------------------------ */
+async function buildCloudPayload(){
+  const counters = await idbGet('meta','counters');
+  return {
+    savedAt: nowISO(),
+    assets: state.assets,
+    history: state.history,
+    settings: state.settings,
+    categories: CATEGORIES,
+    meta: { version: state.meta.version, changelog: state.meta.changelog },
+    counters: counters ? counters.values : {}
+  };
+}
+async function applyRemoteData(remote){
+  if(!remote || !Array.isArray(remote.assets)) return;
+  state.cloud.applyingRemote = true;
+  try{
+    await idbClear('assets'); await idbClear('history'); await idbClear('settings'); await idbClear('meta');
+    for(const a of remote.assets) await idbPut('assets', a);
+    for(const h of (remote.history||[])) await idbPut('history', h);
+    if(remote.settings) await idbPut('settings', Object.assign({key:'main'}, remote.settings));
+    const cats = Array.isArray(remote.categories) && remote.categories.length ? remote.categories : DEFAULT_CATEGORIES.map(c=>Object.assign({},c));
+    await idbPut('meta', { key:'categories', list: cats });
+    const metaVersion = remote.meta && remote.meta.version ? remote.meta.version : state.meta.version;
+    const metaChangelog = remote.meta && remote.meta.changelog ? remote.meta.changelog : state.meta.changelog;
+    await idbPut('meta', { key:'version', version: metaVersion, changelog: metaChangelog });
+    await idbPut('meta', { key:'counters', values: remote.counters || {} });
+    await idbPut('settings', {
+      key:'cloud', clientId: state.cloud.clientId, apiKey: state.cloud.apiKey,
+      folderId: state.cloud.folderId, fileId: state.cloud.fileId
+    });
+    await loadAllData();
+    render();
+  } finally {
+    state.cloud.applyingRemote = false;
+  }
+}
+
+/* ---- Connect / push / poll ------------------------------------------------ */
+async function cloudInitialConnect(){
+  updateCloudBanner(); renderCloudSidebar();
+  try{
+    setCloudStatus('busy','Connecting…');
+    const existing = await findMasterFile();
+    if(existing){
+      state.cloud.fileId = existing.id;
+      await saveCloudConfigToDB();
+      const remote = await downloadMasterFile(existing.id);
+      await applyRemoteData(remote);
+      state.cloud.lastRemoteModified = existing.modifiedTime;
+      showToast('Loaded the live database from Google Drive.');
+    } else {
+      const payload = await buildCloudPayload();
+      const created = await createMasterFile(payload);
+      state.cloud.fileId = created.id;
+      state.cloud.lastRemoteModified = created.modifiedTime;
+      await saveCloudConfigToDB();
+      showToast(`Created ${CLOUD_FILE_NAME} in the shared folder.`);
+    }
+    state.cloud.lastSync = nowISO();
+    setCloudStatus('on','Synced');
+    clearInterval(cloudPollTimer);
+    cloudPollTimer = setInterval(pollCloud, CLOUD_POLL_MS);
+  }catch(err){
+    setCloudStatus('off','Error');
+    showToast('Google Drive connection failed: '+err.message,'error');
+  }
+  render();
+}
+function scheduleCloudPush(){
+  if(typeof state === 'undefined' || !state.cloud) return;
+  if(!state.cloud.connected || !state.cloud.fileId || state.cloud.applyingRemote){ if(state.cloud) state.cloud.dirty = true; return; }
+  clearTimeout(cloudPushTimer);
+  cloudPushTimer = setTimeout(()=>{ pushToCloud(); }, 500);
+}
+async function pushToCloud(){
+  if(!state.cloud.connected || !state.cloud.fileId || state.cloud.applyingRemote) return;
+  try{
+    state.cloud.syncing = true; setCloudStatus('busy','Syncing…'); renderCloudSidebar();
+    const payload = await buildCloudPayload();
+    const updated = await updateMasterFile(state.cloud.fileId, payload);
+    state.cloud.lastRemoteModified = updated.modifiedTime;
+    state.cloud.lastSync = nowISO();
+    state.cloud.dirty = false;
+    setCloudStatus('on','Synced');
+  }catch(err){
+    setCloudStatus('off','Sync error');
+    showToast('Cloud sync failed: '+err.message,'error');
+  } finally {
+    state.cloud.syncing = false; renderCloudSidebar();
+  }
+}
+async function pollCloud(){
+  if(!state.cloud.connected || !state.cloud.fileId || state.cloud.syncing || state.cloud.applyingRemote) return;
+  try{
+    const meta = await getMasterFileMeta(state.cloud.fileId);
+    if(meta.modifiedTime && meta.modifiedTime !== state.cloud.lastRemoteModified){
+      const remote = await downloadMasterFile(state.cloud.fileId);
+      await applyRemoteData(remote);
+      state.cloud.lastRemoteModified = meta.modifiedTime;
+      state.cloud.lastSync = nowISO();
+      showToast('Synced changes from another device.','info');
+    }
+  }catch(err){
+    // Transient poll errors (e.g. expired token mid-refresh) are silent;
+    // the next successful poll or manual Sync Now will recover.
+  }
+}
+async function cloudManualSync(){
+  if(!state.cloud.connected){ showToast('Sign in to Google Drive first.','error'); return; }
+  await pollCloud();
+  if(state.cloud.dirty) await pushToCloud();
+  showToast('Sync check complete.');
 }
 
 /* ---------------------------------------------------------------------------
@@ -1828,6 +2425,23 @@ function renderPrintRoot(html){
 async function exportSinglePdf(item){
   await exportPdfFromHtml(a4TemplateHtml(item, true), `${item.assetNumber||'asset'}-manifest.pdf`, 'download');
 }
+async function downloadSummaryCardImage(){
+  const el = document.getElementById('dash-summary-card');
+  if(!el) return;
+  try{
+    const canvas = await html2canvas(el, {
+      scale:2, backgroundColor:'#ffffff',
+      ignoreElements: (node)=> !!(node.classList && node.classList.contains('no-capture'))
+    });
+    const link = document.createElement('a');
+    link.download = `assets-inventory-summary-${dashPeriod}-${new Date().toISOString().slice(0,10)}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('Summary image downloaded.');
+  }catch(err){
+    showToast('Could not generate image: '+err.message, 'error');
+  }
+}
 async function exportPdfFromHtml(html, filename, mode){
   mode = mode || 'download';
   renderPrintRoot(html);
@@ -1882,7 +2496,7 @@ async function seedIfEmpty(){
     { location:'Manager Room', category:'Furniture', name:'Office Chairs', qty:4, condition:'Usable', price:45.00, vendor:'Kandy Furniture Co.' },
     { location:'Main Kitchen', category:'Appliances', name:'Commercial Refrigerator', qty:1, condition:'Usable', price:1250.00, vendor:'ColdTech Lanka' },
     { location:'Generator Room', category:'Utilities', name:'Backup Generator System 20kVA', qty:1, condition:'Usable', price:3800.00, vendor:'PowerGen Sri Lanka' },
-    { location:'Family Room 1', category:'Electronics', name:'Smart LED Television 43"', qty:1, condition:'Usable', price:320.00, vendor:'Softlogic Retail' },
+    { location:'Room 1', category:'Electronics', name:'Smart LED Television 43"', qty:1, condition:'Usable', price:320.00, vendor:'Softlogic Retail' },
     { location:'Guest Pantry', category:'Linen', name:'Cotton Bath Towels', qty:12, condition:'Usable', price:8.50, vendor:'Textura Mills' },
     { location:'Lobby', category:'Furniture', name:'Rattan Lounge Sofa Set', qty:2, condition:'Usable', price:410.00, vendor:'Moratuwa Woodcraft' },
   ];
@@ -1910,6 +2524,7 @@ async function loadAllData(){
   state.history = (await idbGetAll('history')).sort((a,b)=> new Date(b.date)-new Date(a.date));
   await loadCategories();
   await loadSettings();
+  await loadCloudConfig();
   await initMeta();
 }
 
@@ -1919,6 +2534,9 @@ async function boot(){
     await loadAllData();
     await seedIfEmpty();
     render();
+    window.addEventListener('online', updateCloudBanner);
+    window.addEventListener('offline', updateCloudBanner);
+    attemptSilentCloudSignIn();
   }catch(err){
     document.getElementById('view-root').innerHTML = `<div class="bg-red-50 border border-red-200 text-red-700 rounded-xl p-6">
       <p class="font-semibold mb-1">Failed to initialize local database.</p><p class="text-sm">${escapeHtml(err.message||String(err))}</p>
